@@ -1,6 +1,6 @@
 import { signIn, useSession } from "next-auth/react"
 import Link from "next/link"
-const baseUrl = process.env.NEXT_API
+
 
 export default function Index() {
 
