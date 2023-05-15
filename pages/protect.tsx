@@ -1,24 +1,29 @@
 
 import { GetServerSideProps } from 'next'
 import { getServerSession } from "next-auth/next"
-import { signOut } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 import { nextAuthOptions } from './api/auth/[...nextauth]'
+import { useEffect } from 'react'
 
 
-export default function Protect({ credential }: { credential: { token: string, refresh_token: string } }) {
-    // async function ambilsession() {
-    //     const sss = await getSession()
-    //     console.log(sss)
-    // }
+export default function Protect() {
+    const { data: session } = useSession()
 
-    // useEffect(() => {
-    //     ambilsession()
-    // }, [])
-    console.log(credential)
+    const logout = async () => {
+        const response = await signOut({ redirect: false })
+    }
+
+    useEffect(() => {
+        if (session?.user.error === "RefreshAccessTokenError") {
+            logout()
+            window.location.reload()
+        }
+    }, [session]);
+
     return (
         <div>
             <p> protect</p>
-            <button onClick={() => signOut()}>Sign out</button>
+            <button onClick={() => logout()}>Sign out</button>
         </div>
     )
 }
@@ -27,7 +32,7 @@ export default function Protect({ credential }: { credential: { token: string, r
 export const getServerSideProps: GetServerSideProps = async (context) => {
     const session = await getServerSession(context.req, context.res, nextAuthOptions)
 
-    if (session?.token === undefined || session.token === '') {
+    if (session?.user.token === undefined || session.user.token === '') {
         return {
             redirect: {
                 destination: '/',
@@ -37,11 +42,6 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     }
 
     return {
-        props: {
-            credential: {
-                token: session.token,
-                refresh_token: session.refresh_token
-            },
-        },
+        props: {},
     }
 }

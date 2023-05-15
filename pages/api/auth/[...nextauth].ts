@@ -16,29 +16,65 @@ export const nextAuthOptions: NextAuthOptions = {
                 password: { label: "Password", type: "password", required: true }
             },
             async authorize(credentials, req) {
-                const response = await axios.post(`${baseUrl}/login`, {
-                    email: credentials?.email,
-                    password: credentials?.password
-                })
-                if (response.status >= 200 && response.status < 300) {
-                    return { ...response.data, email: credentials?.email, name: credentials?.email }
+                try {
+                    const response = await axios.post(`${baseUrl}/login`, {
+                        email: credentials?.email,
+                        password: credentials?.password
+                    })
+                    if (response.status >= 200 && response.status < 300) {
+                        var expires_in = new Date();
+                        const time = Math.floor(response.data.expires_in / 60)
+                        expires_in.setMinutes(expires_in.getMinutes() + time);
 
+                        return {
+                            ...response.data,
+                            token: response.data.token,
+                            refresh_token: response.data.refresh_token,
+                            expires: expires_in.getTime(),
+                        }
+                    }
+                    return null
+                } catch (error: any) {
+                    throw new Error(JSON.stringify({
+                        statusCode: error.response.status,
+                        data: error.response.data
+                    }))
                 }
-                return null
             }
         })
     ],
     callbacks: {
-        jwt({ token, user }) {
+        async jwt({ token, user }) {
             if (user) {
                 token.token = user.token
                 token.refresh_token = user.refresh_token
+                token.expires = user.expires
+                return token
+            } else if (new Date().getTime() < token.expires) {
+                return token
+            } else {
+                try {
+                    const response = await axios.post("/refresh-token", { refresh_token: token.refresh_token })
+                    if (response.status >= 200 && response.status < 300) {
+                        var expires_in = new Date();
+                        const time = Math.floor(response.data.expires_in / 60)
+                        expires_in.setMinutes(expires_in.getMinutes() + time);
+                        return {
+                            ...response.data,
+                            token: response.data.token,
+                            refresh_token: response.data.refresh_token,
+                            expires: expires_in.getTime(),
+                        }
+                    }
+                    return { ...token, error: "RefreshAccessTokenError" as const }
+                } catch (error: any) {
+                    return { ...token, error: "RefreshAccessTokenError" as const }
+                }
             }
-            return token
+
         },
         async session({ session, token, user }) {
-            session.token = token.token ?? ''
-            session.refresh_token = token.refresh_token ?? ''
+            session.user = token
             return session
         }
     }
